@@ -1,0 +1,284 @@
+#ifndef __TGESTURE_RECOGNIZER_H__
+#define __TGESTURE_RECOGNIZER_H__
+
+// 제스처 관련된 UI 컨트롤 클래스 
+
+#include "cocos2d.h"
+
+USING_NS_CC;
+
+class PixGesture;
+class PixGestureTap;
+class PixGestureLongPress;
+class PixGesturePan;
+class PixGesturePinch;
+class PixGestureRotation;
+class PixGestureSwipe;
+
+class PixGestureHandler
+{
+public:
+	
+	virtual bool onGestureTap(PixGestureTap* gesture) { return false; };
+	virtual bool onGestureLongPress(PixGestureLongPress* gesture) { return false; };
+	virtual bool onGesturePan(PixGesturePan* gesture) { return false; };
+	virtual bool onGesturePinch(PixGesturePinch* gesture) { return false; };
+	virtual bool onGestureRotation(PixGestureRotation* gesture) { return false; };
+	virtual bool onGestureSwipe(PixGestureSwipe* gesture) { return false; };
+};
+
+class PixGesture : public Ref
+{
+	CC_SYNTHESIZE(int, _id, ID);
+	CC_SYNTHESIZE_PASS_BY_REF(Vec2, _location, Location);
+
+public:
+	inline Vec2 getLocationInView()
+	{
+		return Director::getInstance()->convertToUI(_location);
+	}
+};
+
+
+class PixGestureTap : public PixGesture
+{
+	CC_SYNTHESIZE(int, _numClicks, NumClicks);
+};
+
+class PixGestureLongPress : public PixGesture
+{
+	CC_SYNTHESIZE(float, _threshold, Threshold);
+};
+
+
+class PixGesturePan : public PixGesture
+{
+	CC_SYNTHESIZE_PASS_BY_REF(Vec2, _translation, Translation);
+};
+
+class PixGesturePinch : public PixGesture
+{
+	CC_SYNTHESIZE(float, _scale, Scale);
+	CC_SYNTHESIZE(Touch*, _touch0, Touch0);
+	CC_SYNTHESIZE(Touch*, _touch1, Touch1);
+
+public:
+	
+	PixGesturePinch()
+	{
+		_touch0 = nullptr;
+		_touch1 = nullptr;
+	}
+};
+
+class PixGestureRotation : public PixGesture
+{
+	CC_SYNTHESIZE(float, _rotation, Rotation); // Rotation in Degrees
+
+public:
+	inline float getRotationInRadians()
+	{
+		return CC_DEGREES_TO_RADIANS(_rotation);
+	}
+};
+
+
+typedef enum {
+	SwipeDirectionUnkown,
+	SwipeDirectionNorth,
+	SwipeDirectionNorthWest,
+	SwipeDirectionNorthEast,
+	SwipeDirectionSouth,
+	SwipeDirectionSouthWest,
+	SwipeDirectionSouthEast,
+	SwipeDirectionEast,
+	SwipeDirectionWest,
+}
+SwipeDirection;
+
+class PixGestureSwipe : public PixGesture
+{
+	CC_SYNTHESIZE_PASS_BY_REF(Vec2, _endLocation, EndLocation);
+	CC_SYNTHESIZE(float, _duration, Duration);
+
+public:
+	inline Vec2 getDirectionVec()
+	{
+		return _endLocation - _location;
+	}
+
+	inline SwipeDirection getDirection()
+	{
+		Vec2 origin(0, 1); // With swipe North, this gives an angle of 0 degree
+		float angle = getDirectionVec().getAngle(origin);
+		angle = CC_RADIANS_TO_DEGREES(angle);
+
+		SwipeDirection direction = SwipeDirectionUnkown;
+
+		if (-90.0f * 1 / 4 <= angle && angle < 90.0f * 1 / 4)
+		{
+			direction = SwipeDirectionNorth;
+		}
+		else if (90.0f * 1 / 4 <= angle && angle < 90.0f * 3 / 4)
+		{
+			direction = SwipeDirectionNorthEast;
+		}
+		else if (90.0f * 3 / 4 <= angle && angle < 90.0f * 5 / 4)
+		{
+			direction = SwipeDirectionEast;
+		}
+		else if (90.0f * 5 / 4 <= angle && angle < 90.0f * 7 / 4)
+		{
+			direction = SwipeDirectionSouthEast;
+		}
+		else if ((90.0f * 7 / 4 <= angle && angle <= 90.0f * 8 / 4) || (-90.0f * 8 / 4 <= angle && angle < -90.0f * 7 / 4))
+		{
+			direction = SwipeDirectionSouth;
+		}
+		else if (-90.0f * 7 / 4 <= angle && angle < -90.0f * 5 / 4)
+		{
+			direction = SwipeDirectionSouthWest;
+		}
+		else if (-90.0f * 5 / 4 <= angle && angle < -90.0f * 3 / 4)
+		{
+			direction = SwipeDirectionWest;
+		}
+		else if (-90.0f * 3 / 4 <= angle && angle < -90.0f * 1 / 4)
+		{
+			direction = SwipeDirectionNorthWest;
+		}
+		else
+		{
+			CCLOG("TGestureSwipe::getDirection() - where is the error?");
+		}
+
+		return direction;
+	}
+
+	inline float getVelocity()
+	{
+		return _endLocation.getDistance(_location) / _duration;
+	}
+
+	inline float getLength()
+	{
+		return _endLocation.getDistance(_location);
+	}
+};
+
+class PixGestureRecognizer : public Ref
+{
+	CC_SYNTHESIZE(bool, _tapEnabled, TapEnabled);
+	CC_SYNTHESIZE(bool, _doubleTapEnabled, DoubleTapEnabled);
+	CC_SYNTHESIZE(bool, _longPressEnabled, LongPressEnabled);
+	CC_SYNTHESIZE(bool, _panEnabled, PanEnabled);
+	CC_SYNTHESIZE(bool, _pinchEnabled, PinchEnabled);
+	CC_SYNTHESIZE(bool, _rotationEnabled, RotationEnabled);
+	CC_SYNTHESIZE(bool, _swipeEnabled, SwipeEnabled);
+
+	CC_SYNTHESIZE_PASS_BY_REF(Vec2, _tapFingerMoveTolerance, TapFingerMoveTolerance);   // Movement farther than this tolerance will be ignored for tap
+	CC_SYNTHESIZE(float, _tapThreshold, TapThreshold);                      // Max threshold to activate a tap
+	CC_SYNTHESIZE(float, _doubleTapInterval, DoubleTapInterval);            // Max interval between two taps to activate a double tap
+	CC_SYNTHESIZE(float, _longPressThreshold, LongPressThreshold);          // Min threshold to activate a long press
+	CC_SYNTHESIZE(bool, _tapRequiresDoubleTapRecognitionToFail, TapRequiresDoubleTapRecognitionToFail);
+	CC_SYNTHESIZE(float, _rotationFingersDistanceChangeTolerance, RotationFingersDistanceChangeTolerance);  // Max rotation fingers' distance change
+	CC_SYNTHESIZE(float, _pinchFingersDistanceChangeTolerance, PinchFingersDistanceChangeTolerance);        // Min pinch fingers' distance change
+	CC_SYNTHESIZE(float, _swipeThreshold, SwipeThreshold);                  // Max threshold to activate a swipe
+
+																			// IDs of last fired events for each kind of gesture
+	CC_SYNTHESIZE_READONLY(int, _lastTapId, LastTapID);   // Return -1 when no event of this kind has been fired
+	CC_SYNTHESIZE_READONLY(int, _lastLongPressId, LastLongPressID);
+	CC_SYNTHESIZE_READONLY(int, _lastPanId, LastPanID);
+	CC_SYNTHESIZE_READONLY(int, _lastPinchId, LastPinchID);
+	CC_SYNTHESIZE_READONLY(int, _lastRotationId, LastRotationID);
+	CC_SYNTHESIZE_READONLY(int, _lastSwipeId, LastSwipeID);
+
+	// Client code should use this to register a gesture handler
+	CC_SYNTHESIZE(PixGestureHandler*, _gestureHandler, GestureHandler);
+
+public:
+	PixGestureRecognizer();
+	virtual ~PixGestureRecognizer();
+	virtual bool init();
+
+public:
+	virtual bool onTouchBegan(Touch* touch, Event* event) = 0;
+	virtual void onTouchMoved(Touch* touch, Event* event) = 0;
+	virtual void onTouchEnded(Touch* touch, Event* event) = 0;
+	virtual void onTouchCancelled(Touch* touch, Event* event) = 0;
+
+protected:
+	virtual void fireTapEvent(PixGestureTap* gesture);
+	virtual void fireLongPressEvent(PixGestureLongPress* gesture);
+	virtual void firePanEvent(PixGesturePan* gesture);
+	virtual void firePinchEvent(PixGesturePinch* gesture);
+	virtual void fireRotationEvent(PixGestureRotation* gesture);
+	virtual void fireSwipeEvent(PixGestureSwipe* gesture);
+
+	inline int getNextTapID() { int val = _lastTapId + 1; return val < 0 ? 0 : val; }
+	inline int getNextLongPressID() { int val = _lastLongPressId + 1; return val < 0 ? 0 : val; }
+	inline int getNextPanID() { int val = _lastPanId + 1; return val < 0 ? 0 : val; }
+	inline int getNextPinchID() { int val = _lastPinchId + 1; return val < 0 ? 0 : val; }
+	inline int getNextRotationID() { int val = _lastRotationId + 1; return val < 0 ? 0 : val; }
+	inline int getNextSwipeID() { int val = _lastSwipeId + 1; return val < 0 ? 0 : val; }
+};
+
+
+//
+//
+// TSimpleGestureRecognizer
+//
+//
+
+class PixSimpleGestureRecognizer : public PixGestureRecognizer
+{
+protected:
+	Touch* _finger0;
+	Vec2 _finger0StartPt, _finger0PrevPt, _finger0Pt;
+	bool _finger0Moved;
+	double _finger0StartTime, _finger0Time;
+
+	Touch* _finger1;
+	Vec2 _finger1StartPt, _finger1PrevPt, _finger1Pt;
+	bool _finger1Moved;
+
+	// Tap/Double tap
+	PixGestureTap* _lastTap;
+	bool _tapValid;
+	double _lastTapTime;
+	bool _tapActivatingScheduled;
+
+	// Long press
+	bool _longPressActivatingScheduled;
+
+	// Pan
+	PixGesturePan* _lastPan;
+
+	// Pinch
+	PixGesturePinch* _lastPinch;
+
+	// Rotation
+	PixGestureRotation* _lastRotation;
+
+public:
+	PixSimpleGestureRecognizer();
+	virtual ~PixSimpleGestureRecognizer();
+	virtual bool init();
+
+public:
+	virtual bool onTouchBegan(Touch* touch, Event* event);
+	virtual void onTouchMoved(Touch* touch, Event* event);
+	virtual void onTouchEnded(Touch* touch, Event* event);
+	virtual void onTouchCancelled(Touch* touch, Event* event);
+
+protected:
+	void onLongPressActivate(float time);
+	void onTapActivate(float time);
+
+private:
+	// Get current time
+	double getCurrentTime();
+};
+
+
+#endif /* __TGESTURE_RECOGNIZER_H__ */
